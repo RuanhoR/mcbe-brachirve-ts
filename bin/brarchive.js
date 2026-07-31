@@ -1,6 +1,8 @@
 #!/usr/bin/env node
+// CLI entry point: wires up the cac app (built into dist/cli.mjs) and parses argv.
 import { createCliApp } from '../dist/cli.mjs';
 
+// The original C++ tool printed "No args." and exited non-zero.
 if (process.argv.length <= 2) {
   console.error('No args.');
   process.exit(1);

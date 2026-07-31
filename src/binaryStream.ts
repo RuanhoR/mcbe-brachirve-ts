@@ -1,3 +1,8 @@
+/**
+ * Cursor-based reader/writer over a Buffer, mirroring the original C++
+ * `BinaryStream`. Numbers default to little-endian; big-endian helpers are
+ * provided for the magic number.
+ */
 export class BinaryStream {
   private pos = 0;
   private chunks: Buffer[] = [];
@@ -10,6 +15,7 @@ export class BinaryStream {
     }
   }
 
+  // Readers
   // Readers
   readByte(): number {
     if (!this.buffer) throw new Error('BinaryStream is in write mode');
@@ -47,6 +53,7 @@ export class BinaryStream {
   }
 
   // Writers
+  // Writers
   writeByte(value: number): void {
     const byte = Buffer.allocUnsafe(1);
     byte.writeUInt8(value & 0xff);
@@ -65,6 +72,7 @@ export class BinaryStream {
     this.chunks.push(bytes);
   }
 
+  // 1 length byte + up to maxLength bytes of name, padded with null bytes.
   writeString(value: string, maxLength: number): void {
     const name = Buffer.from(value, 'utf8').subarray(0, maxLength);
     const length = Buffer.allocUnsafe(1);

@@ -3,9 +3,21 @@ import * as path from 'node:path';
 
 import { BinaryStream } from './binaryStream';
 
+/**
+ * Minecraft: Bedrock Edition `.brarchive` binary layout
+ * (see https://gist.github.com/tryashtar/4e62280c1611d744b6aa5d752ab69c15):
+ *
+ *  - 8 bytes  : magic number (big-endian)
+ *  - 4 bytes  : entry count (little-endian)
+ *  - 4 bytes  : version, always 1 (little-endian)
+ *  - entries  : 256 bytes each = 1-byte name length + 247-byte padded name
+ *               + 4-byte offset (LE) + 4-byte length (LE)
+ *  - data block: concatenated file contents; offsets are relative to its start
+ */
 export const HEADER = 0x7d2725b1a0527026n;
 export const VERSION = 1;
 
+// Names are stored as 1 length byte + up to 247 bytes of name.
 const NAME_MAX_LENGTH = 247;
 
 export interface FileEntry {
@@ -20,6 +32,8 @@ export interface ArchiveFile {
   data: string;
 }
 
+// Removes `// line` and `/* block */` comments without touching them inside strings,
+// mimicking rapidjson's kParseCommentsFlag used by the original C++ tool.
 function stripJsonComments(json: string): string {
   let out = '';
   let i = 0;
@@ -63,6 +77,8 @@ function parseJson(raw: string): unknown {
   try {
     return JSON.parse(stripJsonComments(raw));
   } catch {
+    // rapidjson would produce an empty document on parse failure;
+    // here we just treat unparseable payloads as opaque text.
     return undefined;
   }
 }
@@ -79,6 +95,7 @@ export function readArchive(input: Buffer | string): FileEntry[] {
   const count = stream.readUInt32LE();
   stream.readUInt32LE(); // version
 
+  // The entry index comes first: name + offset + length per file.
   const files: FileEntry[] = [];
   for (let i = 0; i < count; i++) {
     const nameLength = stream.readByte();
@@ -88,6 +105,7 @@ export function readArchive(input: Buffer | string): FileEntry[] {
     files.push({ name, offset, length, data: '' });
   }
 
+  // Everything after the index is the data block.
   const content = stream.readRemaining();
   for (const file of files) {
     const raw = content.subarray(file.offset, file.offset + file.length).toString('utf8');
@@ -104,6 +122,8 @@ export function writeArchive(files: ArchiveFile[]): Buffer {
   stream.writeUInt32LE(files.length);
   stream.writeUInt32LE(VERSION);
 
+  // All entries are written first; the data block is appended afterwards,
+  // so each file's offset is the running sum of previous data lengths.
   const dataChunks: Buffer[] = [];
   let offset = 0;
   for (const file of files) {
@@ -118,6 +138,8 @@ export function writeArchive(files: ArchiveFile[]): Buffer {
   return Buffer.concat([stream.getBuffer(), ...dataChunks]);
 }
 
+// Only `.json` files are stored (minified, comments stripped);
+// anything else is stored as an empty entry, matching the original tool.
 function archiveDataFor(dirPath: string, name: string): string {
   const data = readFileSync(path.join(dirPath, name), 'utf8');
   if (path.extname(name) !== '.json') return '';
@@ -172,6 +194,8 @@ export function generate(inputDir: string): string[] {
     throw new Error(`Failed to find input directory: ${inputDir}`);
   }
 
+  // Pack every sub-directory into `<inputDir>/__brarchive/<relative>.brarchive`,
+  // skipping anything that already lives under a `__brarchive` folder.
   const written: string[] = [];
   for (const dir of listSubdirectories(inputDir)) {
     const rel = toPosix(path.relative(inputDir, dir));
@@ -199,6 +223,9 @@ export function extract(input: string): string[] {
     return extractSingleFile(input);
   }
 
+  // Directory mode: find every `.brarchive` under `__brarchive`, derive the target
+  // folder from the archive path (e.g. `__brarchive/sub/foo.brarchive` -> `sub/foo`),
+  // and write each entry back next to the sources.
   const written: string[] = [];
   for (const filePath of listFiles(input)) {
     const rel = toPosix(path.relative(input, filePath));

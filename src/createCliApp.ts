@@ -9,6 +9,11 @@ export interface CreateCliAppOptions {
   version?: string;
 }
 
+/**
+ * Builds the `brarchive` CLI app with cac. Registering commands is kept here so
+ * the app is easy to test/embed; the actual `cli.parse()` call lives in the bin
+ * entry, which also handles "no args" and uncaught errors.
+ */
 export function createCliApp(options: CreateCliAppOptions = {}): CAC {
   const cli = cac('brarchive');
 
@@ -32,6 +37,7 @@ export function createCliApp(options: CreateCliAppOptions = {}): CAC {
       console.log(`Extracted ${written.length} file(s).`);
     });
 
+  // cac dispatches `command:*` when no registered command matched.
   cli.addEventListener('command:*', () => {
     console.log(`Unknown command: ${cli.args[0]}`);
     process.exit(1);
