@@ -1,4 +1,5 @@
 node_modules/
 dist/
 *.brarchive
+!test/e2e/fixtures/**/*.brarchive
 .DS_Store

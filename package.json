@@ -35,13 +35,17 @@
     "build:dts": "tsc -p tsconfig.build.json",
     "prepublishOnly": "pnpm build && pnpm build:dts",
     "dev": "pnpm build && node bin/brarchive.js",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:e2e": "vitest run --project e2e",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "rolldown": "^1.1.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "cac": "^7.0.0"
