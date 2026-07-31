@@ -21,10 +21,11 @@
     }
   },
   "bin": {
-    "brarchive": "./dist/cli.mjs"
+    "brarchive": "./bin/brarchive.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "engines": {
     "node": ">=20"
@@ -33,7 +34,7 @@
     "build": "rolldown -c",
     "build:dts": "tsc -p tsconfig.build.json",
     "prepublishOnly": "pnpm build && pnpm build:dts",
-    "dev": "tsx src/cli.ts",
+    "dev": "pnpm build && node bin/brarchive.js",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -41,5 +42,8 @@
     "rolldown": "^1.1.0",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "cac": "^7.0.0"
   }
 }

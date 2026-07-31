@@ -22,7 +22,7 @@ export default defineConfig([
     ],
   },
   {
-    input: { cli: 'src/cli.ts' },
+    input: { cli: 'src/createCliApp.ts' },
     platform: 'node',
     external: [nodeBuiltins],
     output: [
@@ -30,7 +30,6 @@ export default defineConfig([
         dir: 'dist',
         format: 'esm',
         entryFileNames: '[name].mjs',
-        banner: '#!/usr/bin/env node',
       },
     ],
   },
