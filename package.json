@@ -1,6 +1,6 @@
 {
-  "name": "brarchive",
-  "version": "1.0.0",
+  "name": "mcbe-brarchive-ts",
+  "version": "0.1.0",
   "description": "Read/generate Minecraft: Bedrock Edition .brarchive files. A TypeScript port of xKingDark-brachive.",
   "keywords": [
     "minecraft",

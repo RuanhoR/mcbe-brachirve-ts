@@ -9,9 +9,10 @@
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "rootDir": ".",
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true
   },
-  "include": ["src", "rolldown.config.ts"]
+  "include": ["src", "rolldown.config.ts", "tests"]
 }

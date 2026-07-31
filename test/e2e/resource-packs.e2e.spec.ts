@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { extract, generate, readArchive } from '../../src/index';
 
-const FIXTURE = join(process.cwd(), 'test', 'e2e', 'fixtures', 'resource_packs');
+const FIXTURE = join(process.cwd(), 'test', 'e2e', 'fixtures', '01');
 
 let workDir = '';
 let packDir = '';
