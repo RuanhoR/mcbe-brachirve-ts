@@ -66,14 +66,14 @@ describe('writeArchive', () => {
     const files = readArchive(buf);
     expect(files).toHaveLength(1);
     expect(files[0].name).toBe('a.json');
-    expect(files[0].data).toBe('{\n    "a": 1\n}');
+    expect(files[0].data.toString('utf8')).toBe('{\n    "a": 1\n}');
   });
 });
 
 describe('readArchive', () => {
   it('pretty-prints JSON with a 4-space indent', () => {
     const buf = writeArchive([{ name: 'a.json', data: '{"x":[1,2]}' }]);
-    expect(readArchive(buf)[0].data).toBe('{\n    "x": [\n        1,\n        2\n    ]\n}');
+    expect(readArchive(buf)[0].data.toString('utf8')).toBe('{\n    "x": [\n        1,\n        2\n    ]\n}');
   });
 
   it('throws on an invalid header', () => {
@@ -82,7 +82,7 @@ describe('readArchive', () => {
 
   it('preserves non-JSON payloads verbatim', () => {
     const buf = writeArchive([{ name: 'a.bin', data: 'hello world' }]);
-    expect(readArchive(buf)[0].data).toBe('hello world');
+    expect(readArchive(buf)[0].data.toString('utf8')).toBe('hello world');
   });
 });
 
@@ -108,20 +108,32 @@ describe('generate / extract', () => {
     generate(root);
     const files = readArchive(join(root, '__brarchive', 'a.brarchive'));
     expect(files).toHaveLength(1);
-    expect(files[0].data).toBe('{\n    "x": 1\n}');
+    expect(files[0].data.toString('utf8')).toBe('{\n    "x": 1\n}');
   });
 
-  it('stores non-JSON files with zero length', () => {
+  it('preserves non-JSON files verbatim when generating', () => {
     const root = makeDir();
     mkdirSync(join(root, 'a'));
     writeFileSync(join(root, 'a', 'x.json'), '{"x":1}');
-    writeFileSync(join(root, 'a', 'icon.png'), 'PNG...');
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]);
+    writeFileSync(join(root, 'a', 'icon.png'), png);
 
     generate(root);
     const files = readArchive(join(root, '__brarchive', 'a.brarchive'));
     const icon = files.find((file) => file.name === 'icon.png');
-    expect(icon?.length).toBe(0);
-    expect(icon?.data).toBe('');
+    expect(icon?.length).toBe(png.length);
+    expect(icon?.data).toEqual(png);
+  });
+
+  it('round-trips binary files through generate then extract', () => {
+    const root = makeDir();
+    mkdirSync(join(root, 'a'));
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]);
+    writeFileSync(join(root, 'a', 'icon.png'), png);
+
+    generate(root);
+    extract(root);
+    expect(readFileSync(join(root, 'a', 'icon.png'))).toEqual(png);
   });
 
   it('write() emits <out>.brarchive', () => {

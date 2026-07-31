@@ -24,12 +24,12 @@ export interface FileEntry {
   name: string;
   offset: number;
   length: number;
-  data: string;
+  data: Buffer;
 }
 
 export interface ArchiveFile {
   name: string;
-  data: string;
+  data: string | Buffer;
 }
 
 // Removes `// line` and `/* block */` comments without touching them inside strings,
@@ -102,15 +102,15 @@ export function readArchive(input: Buffer | string): FileEntry[] {
     const name = stream.readString(NAME_MAX_LENGTH).slice(0, nameLength);
     const offset = stream.readUInt32LE();
     const length = stream.readUInt32LE();
-    files.push({ name, offset, length, data: '' });
+    files.push({ name, offset, length, data: Buffer.alloc(0) });
   }
 
   // Everything after the index is the data block.
   const content = stream.readRemaining();
   for (const file of files) {
-    const raw = content.subarray(file.offset, file.offset + file.length).toString('utf8');
-    const parsed = parseJson(raw);
-    file.data = parsed === undefined ? raw : JSON.stringify(parsed, null, 4);
+    const raw = content.subarray(file.offset, file.offset + file.length);
+    const parsed = parseJson(raw.toString('utf8'));
+    file.data = parsed === undefined ? raw : Buffer.from(JSON.stringify(parsed, null, 4) ?? '', 'utf8');
   }
 
   return files;
@@ -127,7 +127,7 @@ export function writeArchive(files: ArchiveFile[]): Buffer {
   const dataChunks: Buffer[] = [];
   let offset = 0;
   for (const file of files) {
-    const data = Buffer.from(file.data, 'utf8');
+    const data = Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data, 'utf8');
     stream.writeString(file.name, NAME_MAX_LENGTH);
     stream.writeUInt32LE(offset);
     stream.writeUInt32LE(data.length);
@@ -138,13 +138,13 @@ export function writeArchive(files: ArchiveFile[]): Buffer {
   return Buffer.concat([stream.getBuffer(), ...dataChunks]);
 }
 
-// Only `.json` files are stored (minified, comments stripped);
-// anything else is stored as an empty entry, matching the original tool.
-function archiveDataFor(dirPath: string, name: string): string {
-  const data = readFileSync(path.join(dirPath, name), 'utf8');
-  if (path.extname(name) !== '.json') return '';
-  const parsed = parseJson(data);
-  return parsed === undefined ? '' : JSON.stringify(parsed);
+// JSON files are stored minified with comments stripped; any other file (images,
+// lang files, ...) is stored verbatim as-is, preserving its exact bytes.
+function archiveDataFor(dirPath: string, name: string): Buffer {
+  const data = readFileSync(path.join(dirPath, name));
+  if (path.extname(name) !== '.json') return data;
+  const parsed = parseJson(data.toString('utf8'));
+  return parsed === undefined ? data : Buffer.from(JSON.stringify(parsed), 'utf8');
 }
 
 export function write(dirPath: string, outBase: string): string {
@@ -211,7 +211,7 @@ function extractSingleFile(input: string): string[] {
   const written: string[] = [];
   for (const file of readArchive(input)) {
     const outFile = path.join(outDir, file.name);
-    writeFileSync(outFile, file.data, 'utf8');
+    writeFileSync(outFile, file.data);
     written.push(outFile);
   }
   return written;
@@ -241,7 +241,7 @@ export function extract(input: string): string[] {
     mkdirSync(outDir, { recursive: true });
     for (const file of readArchive(filePath)) {
       const outFile = path.join(outDir, file.name);
-      writeFileSync(outFile, file.data, 'utf8');
+      writeFileSync(outFile, file.data);
       written.push(outFile);
     }
   }

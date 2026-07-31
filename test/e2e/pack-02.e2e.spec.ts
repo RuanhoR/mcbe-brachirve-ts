@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -52,6 +52,14 @@ describe('fixture 02 packing e2e', () => {
     }
     expect(before.size).toBeGreaterThan(0);
 
+    // 记录解包出的图片字节长度
+    const imagesBefore = new Map<string, number>();
+    for (const file of listFiles(packDir)) {
+      if (!/\.(png|tga|jpe?g|gif|bmp|webp)$/i.test(file)) continue;
+      imagesBefore.set(file, statSync(file).size);
+    }
+    expect(imagesBefore.size).toBeGreaterThan(0);
+
     // 打包：用解包结果重新生成 .brarchive
     const written = generate(packDir);
     expect(written.length).toBeGreaterThan(0);
@@ -70,6 +78,11 @@ describe('fixture 02 packing e2e', () => {
     extract(packDir);
     for (const [file, original] of before) {
       expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(original);
+    }
+
+    // 图片只验证字节长度一致
+    for (const [file, size] of imagesBefore) {
+      expect(statSync(file).size).toBe(size);
     }
   });
 });
