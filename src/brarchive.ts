@@ -1,4 +1,5 @@
-import { createReadStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
+import type { WriteStream } from 'node:fs';
 import { open, readdir, readFile, stat, mkdir, writeFile } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import * as path from 'node:path';
@@ -23,6 +24,10 @@ const NAME_MAX_LENGTH = 247;
 // Bounded concurrency for archive/file operations so many small files do not
 // open an unbounded number of handles at once.
 const CONCURRENCY = 16;
+
+// Archives up to this size are buffered in a single read (one syscall, zero-copy
+// subarrays). Larger ones are read entry-by-entry on demand to bound memory.
+const READ_ALL_THRESHOLD = 16 * 1024 * 1024;
 
 export interface FileEntry {
   name: string;
@@ -161,23 +166,54 @@ async function readAll(fh: FileHandle, buffer: Buffer, position: number): Promis
   }
 }
 
-async function writeAll(fh: FileHandle, buffer: Buffer, position: number): Promise<void> {
-  let total = 0;
-  while (total < buffer.length) {
-    const { bytesWritten } = await fh.write(buffer, total, buffer.length - total, position + total);
-    if (bytesWritten === 0) throw new Error('Failed to write archive file');
-    total += bytesWritten;
+// Writes one chunk through a stream, applying backpressure via the write
+// callback so large archives are flushed incrementally instead of all at once.
+function writeChunk(ws: WriteStream, chunk: Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ws.write(chunk, (err) => (err ? reject(err) : resolve()));
+  });
+}
+
+// Streams a (potentially large) binary file into the write stream without
+// holding it in memory; its length was already recorded from `stat` when the
+// index was built.
+async function streamFileInto(ws: WriteStream, filePath: string): Promise<void> {
+  for await (const chunk of createReadStream(filePath)) {
+    await writeChunk(ws, chunk);
   }
 }
 
-// Streams a (potentially large) binary file into the archive without holding it
-// in memory; its length was already recorded from `stat` when building the index.
-async function streamFileInto(fh: FileHandle, filePath: string, position: number): Promise<void> {
-  let pos = position;
-  for await (const chunk of createReadStream(filePath)) {
-    await writeAll(fh, chunk, pos);
-    pos += chunk.length;
-  }
+/**
+ * Writes a complete archive to `outFile`. All writes go through one stream so
+ * Node batches many small entries into fewer system calls, while large binary
+ * files are still piped without loading them into RAM.
+ */
+async function writeArchiveStream(
+  outFile: string,
+  header: Buffer,
+  index: Buffer,
+  entries: { data: Buffer | null; filePath: string }[],
+): Promise<void> {
+  const ws = createWriteStream(outFile);
+  await new Promise<void>((resolve, reject) => {
+    ws.on('error', reject);
+    ws.on('finish', () => {
+      ws.removeListener('error', reject);
+      resolve();
+    });
+    (async () => {
+      await writeChunk(ws, header);
+      await writeChunk(ws, index);
+      for (const entry of entries) {
+        if (entry.data) await writeChunk(ws, entry.data);
+        else await streamFileInto(ws, entry.filePath);
+      }
+      ws.end();
+    })().catch((err) => {
+      ws.destroy();
+      reject(err);
+    });
+  });
 }
 
 function parseEntryIndex(index: Buffer, i: number): { name: string; offset: number; length: number } {
@@ -195,8 +231,14 @@ function decodeEntryData(raw: Buffer): Buffer {
 }
 
 async function readArchiveFromFile(filePath: string): Promise<FileEntry[]> {
-  // Slices are read on demand from the file instead of loading the whole archive,
-  // keeping the memory peak bounded for archives with many/large entries.
+  const { size } = await stat(filePath);
+  // Typical archives are buffered with a single read (one syscall, zero-copy
+  // subarrays); huge archives fall back to on-demand slice reads so the whole
+  // file never has to fit in memory at once.
+  if (size <= READ_ALL_THRESHOLD) {
+    return readArchiveFromBuffer(await readFile(filePath));
+  }
+
   const fh = await open(filePath, 'r');
   try {
     const header = Buffer.alloc(16);
@@ -282,25 +324,22 @@ export async function writeArchive(files: ArchiveFile[]): Promise<Buffer> {
 }
 
 /**
- * Streams one directory into `<outBase>.brarchive` on disk: JSON files are
- * minified once (parse/stringify only when comments or whitespace exist) and
- * written from memory; everything else is copied through a pipe so its bytes
- * never have to fit in RAM.
+ * Streams one directory into `<outBase>.brarchive` on disk. Files are read and
+ * processed concurrently; JSON is minified once (parse/stringify only when
+ * comments or whitespace exist), binary files are copied through a stream so
+ * their bytes never have to fit in RAM.
  */
 async function archiveDirFiles(dirPath: string, names: string[], outFile: string): Promise<void> {
-  const entries: { name: string; data: Buffer | null; length: number; filePath: string }[] = [];
-  for (const name of names) {
+  const entries = await mapLimit(names, CONCURRENCY, async (name) => {
     const filePath = path.join(dirPath, name);
     if (path.extname(name) === '.json') {
       const data = minifyJsonBuffer(await readFile(filePath));
-      entries.push({ name, data, length: data.length, filePath });
-    } else {
-      const { size } = await stat(filePath);
-      entries.push({ name, data: null, length: size, filePath });
+      return { name, data, length: data.length, filePath };
     }
-  }
+    const { size } = await stat(filePath);
+    return { name, data: null, length: size, filePath };
+  });
 
-  const dataStart = 16 + entries.length * 256;
   const index = Buffer.alloc(entries.length * 256);
   let offset = 0;
   for (let i = 0; i < entries.length; i++) {
@@ -314,28 +353,13 @@ async function archiveDirFiles(dirPath: string, names: string[], outFile: string
     offset += entries[i].length;
   }
 
-  await mkdir(path.dirname(outFile), { recursive: true });
-  const fh = await open(outFile, 'w');
-  try {
-    const header = Buffer.alloc(16);
-    header.writeBigUInt64BE(HEADER, 0);
-    header.writeUInt32LE(entries.length, 8);
-    header.writeUInt32LE(VERSION, 12);
-    await writeAll(fh, header, 0);
-    await writeAll(fh, index, 16);
+  const header = Buffer.alloc(16);
+  header.writeBigUInt64BE(HEADER, 0);
+  header.writeUInt32LE(entries.length, 8);
+  header.writeUInt32LE(VERSION, 12);
 
-    let pos = dataStart;
-    for (const entry of entries) {
-      if (entry.data) {
-        await writeAll(fh, entry.data, pos);
-      } else {
-        await streamFileInto(fh, entry.filePath, pos);
-      }
-      pos += entry.length;
-    }
-  } finally {
-    await fh.close();
-  }
+  await mkdir(path.dirname(outFile), { recursive: true });
+  await writeArchiveStream(outFile, header, index, entries);
 }
 
 export async function write(dirPath: string, outBase: string): Promise<string> {
@@ -406,13 +430,13 @@ export async function generate(inputDir: string): Promise<string[]> {
 async function extractSingleFile(input: string): Promise<string[]> {
   const outDir = path.dirname(input);
   const files = await readArchive(input);
-  const written: string[] = [];
-  for (const file of files) {
+  // Writes are issued concurrently (bounded) so I/O overlaps; result order is
+  // preserved by mapLimit.
+  return mapLimit(files, CONCURRENCY, async (file) => {
     const outFile = path.join(outDir, file.name);
     await writeFile(outFile, file.data);
-    written.push(outFile);
-  }
-  return written;
+    return outFile;
+  });
 }
 
 /** Collects every file under a `__brarchive` directory (single traversal). */
@@ -454,13 +478,12 @@ export async function extract(input: string): Promise<string[]> {
     await mkdir(outDir, { recursive: true });
 
     const files = await readArchive(filePath);
-    const written: string[] = [];
-    for (const file of files) {
+    // Write entries concurrently; mapLimit preserves the file order.
+    return mapLimit(files, CONCURRENCY, async (file) => {
       const outFile = path.join(outDir, file.name);
       await writeFile(outFile, file.data);
-      written.push(outFile);
-    }
-    return written;
+      return outFile;
+    });
   });
 
   return groups.flat().sort((a, b) => a.localeCompare(b));
