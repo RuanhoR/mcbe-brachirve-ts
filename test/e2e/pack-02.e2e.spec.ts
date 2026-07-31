@@ -32,9 +32,9 @@ afterAll(() => {
 });
 
 describe('fixture 02 packing e2e', () => {
-  it('unpacks fixture 02, then packs the unpacked content back (round-trip)', () => {
+  it('unpacks fixture 02, then packs the unpacked content back (round-trip)', async () => {
     // 解包：__brarchive/*.brarchive -> 普通文件夹
-    const unpacked = extract(packDir);
+    const unpacked = await extract(packDir);
     expect(unpacked.length).toBeGreaterThan(0);
     expect(existsSync(join(packDir, 'animations'))).toBe(true);
     expect(existsSync(join(packDir, 'models', 'entity'))).toBe(true);
@@ -61,7 +61,7 @@ describe('fixture 02 packing e2e', () => {
     expect(imagesBefore.size).toBeGreaterThan(0);
 
     // 打包：用解包结果重新生成 .brarchive
-    const written = generate(packDir);
+    const written = await generate(packDir);
     expect(written.length).toBeGreaterThan(0);
     for (const archive of written) {
       // __brarchive/models/entity.brarchive -> 源目录 models/entity
@@ -71,11 +71,11 @@ describe('fixture 02 packing e2e', () => {
         .replace(/\.brarchive$/, '');
       const srcDir = join(packDir, srcRel);
       const expected = readdirSync(srcDir, { withFileTypes: true }).filter((e) => e.isFile()).length;
-      expect(readArchive(archive).length).toBe(expected);
+      expect((await readArchive(archive)).length).toBe(expected);
     }
 
     // 再次解包后所有 JSON 内容应与第一次解包一致
-    extract(packDir);
+    await extract(packDir);
     for (const [file, original] of before) {
       expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(original);
     }

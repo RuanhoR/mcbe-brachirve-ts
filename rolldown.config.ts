@@ -1,35 +1,36 @@
-import { defineConfig } from 'rolldown';
+import { defineConfig } from "rolldown";
 
-const nodeBuiltins = /^(node:)?(fs|path|process|os|util|stream|buffer|events|crypto|url|assert|string_decoder)\/?.*$/;
+const nodeBuiltins =
+  /^(node:)?(fs|path|process|os|util|stream|buffer|events|crypto|url|assert|string_decoder)\/?.*$/;
 
 export default defineConfig([
   {
-    input: { index: 'src/index.ts' },
-    platform: 'node',
-    external: [nodeBuiltins],
+    input: { index: "src/index.ts" },
+    platform: "node",
+    external: [nodeBuiltins, "cac"],
     output: [
       {
-        dir: 'dist',
-        format: 'esm',
-        entryFileNames: '[name].mjs',
+        dir: "dist",
+        format: "esm",
+        entryFileNames: "[name].mjs",
       },
       {
-        dir: 'dist',
-        format: 'cjs',
-        entryFileNames: '[name].cjs',
-        exports: 'named',
+        dir: "dist",
+        format: "cjs",
+        entryFileNames: "[name].cjs",
+        exports: "named",
       },
     ],
   },
   {
-    input: { cli: 'src/createCliApp.ts' },
-    platform: 'node',
-    external: [nodeBuiltins],
+    input: { cli: "src/createCliApp.ts" },
+    platform: "node",
+    external: [nodeBuiltins, "cac"],
     output: [
       {
-        dir: 'dist',
-        format: 'esm',
-        entryFileNames: '[name].mjs',
+        dir: "dist",
+        format: "esm",
+        entryFileNames: "[name].mjs",
       },
     ],
   },

@@ -44,14 +44,14 @@ describe('real resource pack e2e', () => {
     expect(existsSync(join(packDir, '__brarchive'))).toBe(true);
   });
 
-  it('reads the original .brarchive files shipped with the pack', () => {
+  it('reads the original .brarchive files shipped with the pack', async () => {
     const archives = listFiles(join(packDir, '__brarchive')).filter((p) =>
       p.endsWith('.brarchive'),
     );
     expect(archives.length).toBeGreaterThan(0);
 
     for (const archive of archives) {
-      const files = readArchive(archive);
+      const files = await readArchive(archive);
       expect(files.length).toBeGreaterThan(0);
       for (const file of files) {
         expect(typeof file.name).toBe('string');
@@ -60,20 +60,20 @@ describe('real resource pack e2e', () => {
     }
   });
 
-  it('packs every sub-directory into __brarchive once', () => {
+  it('packs every sub-directory into __brarchive once', async () => {
     const dirs = subdirectories(packDir).filter((name) => name !== '__brarchive');
     expect(dirs.length).toBeGreaterThan(0);
 
-    const written = generate(packDir);
+    const written = await generate(packDir);
     for (const dir of dirs) {
       expect(written).toContain(join(packDir, '__brarchive', `${dir}.brarchive`));
     }
     for (const archive of written) {
-      expect(readArchive(archive).length).toBeGreaterThan(0);
+      expect((await readArchive(archive)).length).toBeGreaterThan(0);
     }
   });
 
-  it('unpacks the archive back to files and round-trips every JSON', () => {
+  it('unpacks the archive back to files and round-trips every JSON', async () => {
     const before = new Map<string, unknown>();
     for (const file of listFiles(packDir)) {
       if (!file.endsWith('.json')) continue;
@@ -85,7 +85,7 @@ describe('real resource pack e2e', () => {
     }
     expect(before.size).toBeGreaterThan(0);
 
-    const extracted = extract(packDir);
+    const extracted = await extract(packDir);
     expect(extracted.length).toBeGreaterThan(0);
 
     for (const [file, original] of before) {

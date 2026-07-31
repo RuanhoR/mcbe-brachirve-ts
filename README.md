@@ -26,17 +26,18 @@ import {
 } from "brarchive";
 import type { ArchiveFile, FileEntry } from "brarchive";
 
-// Read an archive from a path or Buffer. `data` is the pretty-printed JSON text.
-const files: FileEntry[] = readArchive("pack/__brarchive/scripts.brarchive");
+// Read an archive from a path or Buffer. `data` is the pretty-printed JSON text
+// (or the raw bytes for non-JSON entries).
+const files: FileEntry[] = await readArchive("pack/__brarchive/scripts.brarchive");
 
 // Build an archive Buffer from in-memory entries.
-const buffer: Buffer = writeArchive([{ name: "a.json", data: '{"a":1}' }]);
+const buffer: Buffer = await writeArchive([{ name: "a.json", data: '{"a":1}' }]);
 
 // Archive every sub-directory of `dir` into `dir/__brarchive/*.brarchive`.
-const generated: string[] = generate("pack");
+const generated: string[] = await generate("pack");
 
 // Extract every .brarchive under `input` (or a single file) back to disk.
-const extracted: string[] = extract("pack");
+const extracted: string[] = await extract("pack");
 ```
 
 ## Format
