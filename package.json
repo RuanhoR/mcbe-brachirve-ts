@@ -1,0 +1,45 @@
+{
+  "name": "brarchive",
+  "version": "1.0.0",
+  "description": "Read/generate Minecraft: Bedrock Edition .brarchive files. A TypeScript port of xKingDark-brachive.",
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "brarchive",
+    "archive"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "brarchive": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "rolldown -c",
+    "build:dts": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm build && pnpm build:dts",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "rolldown": "^1.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
