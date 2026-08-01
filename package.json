@@ -10,18 +10,20 @@
   ],
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./package.json": {
+      "require": "./package.json"
     }
   },
   "bin": {
-    "brarchive": "./bin/brarchive.js"
+    "brarchive": "./bin/brarchive.cjs"
   },
   "files": [
     "dist",
@@ -32,8 +34,7 @@
   },
   "scripts": {
     "build": "rolldown -c",
-    "build:dts": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "pnpm build && pnpm build:dts",
+    "prepublishOnly": "pnpm build",
     "dev": "pnpm build && node bin/brarchive.js",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -48,7 +49,8 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "cac": "^7.0.0"
+    "cac": "^7.0.0",
+    "rolldown-plugin-dts": "^0.28.0"
   },
   "packageManager": "pnpm@11.0.0",
   "publishConfig": {
