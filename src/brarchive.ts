@@ -427,8 +427,9 @@ export async function generate(inputDir: string): Promise<string[]> {
   return written.sort((a, b) => a.localeCompare(b));
 }
 
-async function extractSingleFile(input: string): Promise<string[]> {
-  const outDir = path.dirname(input);
+async function extractSingleFile(input: string, outputDir?: string): Promise<string[]> {
+  const outDir = outputDir ?? path.dirname(input);
+  await mkdir(outDir, { recursive: true });
   const files = await readArchive(input);
   // Writes are issued concurrently (bounded) so I/O overlaps; result order is
   // preserved by mapLimit.
@@ -439,7 +440,10 @@ async function extractSingleFile(input: string): Promise<string[]> {
   });
 }
 
-/** Collects every file under a `__brarchive` directory (single traversal). */
+/**
+ * Collects every `.brarchive` file under `root` (single traversal). Only real
+ * archives are collected, so `extract` never sees loose/non-archive files.
+ */
 async function collectBrarchives(root: string): Promise<string[]> {
   const archives: string[] = [];
   async function visit(dir: string) {
@@ -447,17 +451,17 @@ async function collectBrarchives(root: string): Promise<string[]> {
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) await visit(full);
-      else if (entry.isFile()) archives.push(full);
+      else if (entry.isFile() && entry.name.endsWith('.brarchive')) archives.push(full);
     }
   }
   await visit(root);
   return archives;
 }
 
-export async function extract(input: string): Promise<string[]> {
+export async function extract(input: string, outputDir?: string): Promise<string[]> {
   const st = await stat(input);
   if (st.isFile()) {
-    return extractSingleFile(input);
+    return extractSingleFile(input, outputDir);
   }
 
   // Directory mode: find every `.brarchive` under `__brarchive`, derive the target
@@ -474,7 +478,7 @@ export async function extract(input: string): Promise<string[]> {
 
     const dot = filename.lastIndexOf('.');
     const directory = filename.slice(0, dot === -1 ? filename.length : dot);
-    const outDir = path.join(input, ...directory.split('/'));
+    const outDir = path.join(outputDir ?? input, ...directory.split('/'));
     await mkdir(outDir, { recursive: true });
 
     const files = await readArchive(filePath);

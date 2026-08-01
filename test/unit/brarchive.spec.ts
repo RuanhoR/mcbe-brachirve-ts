@@ -170,6 +170,31 @@ describe('generate / extract', () => {
     expect(JSON.parse(readFileSync(join(root, 'a', 'x.json'), 'utf8'))).toEqual({ x: 1 });
   });
 
+  it('extracts a single archive file to a custom output dir', async () => {
+    const root = makeDir();
+    const out = makeDir();
+    const sub = join(root, 'a');
+    mkdirSync(sub);
+    writeFileSync(join(sub, 'x.json'), '{"x":1}');
+    await write(sub, join(root, '__out'));
+
+    const extracted = await extract(join(root, '__out.brarchive'), out);
+    expect(extracted).toEqual([join(out, 'x.json')]);
+    expect(readFileSync(join(out, 'x.json'), 'utf8')).toBe('{\n    "x": 1\n}');
+  });
+
+  it('extracts a whole directory to a custom output dir', async () => {
+    const root = makeDir();
+    const out = makeDir();
+    mkdirSync(join(root, 'a'));
+    writeFileSync(join(root, 'a', 'x.json'), '{"x":1}');
+    await generate(root);
+
+    const extracted = await extract(root, out);
+    expect(extracted).toContain(join(out, 'a', 'x.json'));
+    expect(JSON.parse(readFileSync(join(out, 'a', 'x.json'), 'utf8'))).toEqual({ x: 1 });
+  });
+
   it('round-trips JSON contents through generate then extract', async () => {
     const root = makeDir();
     mkdirSync(join(root, 'a'));
