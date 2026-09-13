@@ -5,7 +5,7 @@ TypeScript library + CLI for reading/writing Minecraft Bedrock `.brarchive` file
 ## Commands
 
 - `pnpm build` — bundle `src/index.ts` to `dist/` via rolldown (also emits `dist/index.d.ts` via `rolldown-plugin-dts`). Always run before exercising the CLI.
-- `pnpm typecheck` — `tsc --noEmit`. Does **not** cover tests: `tsconfig.json` `include` lists `"tests"` but the dir is `test/`. Don't trust it for test-file changes.
+- `pnpm type-check` — `tsc --noEmit`. Does **not** cover tests: `tsconfig.json` `include` lists `"tests"` but the dir is `test/`. Don't trust it for test-file changes.
 - `pnpm test` — `vitest run`, runs both projects. `pnpm test:unit` / `pnpm test:e2e` filter. e2e is slow (180s timeouts; copies fixtures to a temp dir and round-trips) — prefer `test:unit` for fast iteration.
 - `pnpm dev` is **stale/broken** — it runs `node bin/brarchive.js`, but the entry is `bin/brarchive.cjs`. Use `pnpm build && node bin/brarchive.cjs <args>` instead.
 
