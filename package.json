@@ -23,11 +23,10 @@
     }
   },
   "bin": {
-    "brarchive": "./bin/brarchive.cjs"
+    "brarchive": "./dist/cli.cjs"
   },
   "files": [
-    "dist",
-    "bin"
+    "dist"
   ],
   "engines": {
     "node": ">=20"
@@ -35,7 +34,7 @@
   "scripts": {
     "build": "rolldown -c",
     "prepublishOnly": "pnpm build",
-    "dev": "pnpm build && node bin/brarchive.js",
+    "dev": "pnpm build && node dist/cli.cjs",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:e2e": "vitest run --project e2e",
@@ -43,14 +42,12 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "cac": "^7.0.0",
     "rolldown": "^1.1.0",
+    "rolldown-plugin-dts": "^0.28.0",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.10"
-  },
-  "dependencies": {
-    "cac": "^7.0.0",
-    "rolldown-plugin-dts": "^0.28.0"
   },
   "packageManager": "pnpm@11.0.0",
   "publishConfig": {

@@ -4,15 +4,15 @@ TypeScript library + CLI for reading/writing Minecraft Bedrock `.brarchive` file
 
 ## Commands
 
-- `pnpm build` — bundle `src/index.ts` to `dist/` via rolldown (also emits `dist/index.d.ts` via `rolldown-plugin-dts`). Always run before exercising the CLI.
+- `pnpm build` — bundle `src/index.ts` to `dist/index.js` (+ `dist/index.d.ts` via `rolldown-plugin-dts`) and `src/cli.ts` to the self-contained `dist/cli.cjs` via rolldown. Always run before exercising the CLI.
 - `pnpm type-check` — `tsc --noEmit`. Does **not** cover tests: `tsconfig.json` `include` lists `"tests"` but the dir is `test/`. Don't trust it for test-file changes.
 - `pnpm test` — `vitest run`, runs both projects. `pnpm test:unit` / `pnpm test:e2e` filter. e2e is slow (180s timeouts; copies fixtures to a temp dir and round-trips) — prefer `test:unit` for fast iteration.
-- `pnpm dev` is **stale/broken** — it runs `node bin/brarchive.js`, but the entry is `bin/brarchive.cjs`. Use `pnpm build && node bin/brarchive.cjs <args>` instead.
+- `pnpm dev` — `pnpm build && node dist/cli.cjs`; pass CLI args after, e.g. `pnpm dev -- extract <target>`.
 
 ## CLI
 
-- `bin/brarchive.cjs` does `require('..')`, resolving through package `exports` to `dist/index.js`, so a build is required first.
-- `createCliApp()` (in `src/createCliApp.ts`) is the CLI factory; tests and the bin entry both use it. cac dispatches async actions without awaiting, so every action is tracked in `cli.pendingActions` and the bin entry waits on `Promise.all(cli.pendingActions)` — preserve this pattern.
+- The package has **no runtime `dependencies`**: `cac` is devDependency-only and gets bundled into `dist/cli.cjs`, which is what the `bin` entry (`brarchive`) executes. Library consumers (`dist/index.js`) never load the CLI framework. A build is required before running the CLI.
+- `createCliApp()` (in `src/createCliApp.ts`) is the CLI factory; tests and the CLI entry (`src/cli.ts`) both use it. cac dispatches async actions without awaiting, so every action is tracked in `cli.pendingActions` and `src/cli.ts` waits on `Promise.all(cli.pendingActions)` — preserve this pattern.
 - Commands: `brarchive generate <dir>` (packs every sub-dir into `<dir>/__brarchive/*.brarchive`), `brarchive extract <target> [-o <dir>]`. `--json` prints machine-readable output (errors still go to stderr).
 
 ## Format & behavioral gotchas (see README for the binary layout)

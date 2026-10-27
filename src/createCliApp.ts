@@ -45,10 +45,14 @@ function printResult(payload: unknown, human: string, json: boolean): void {
 
 /**
  * Builds the `brarchive` CLI app with cac. Registering commands is kept here so
- * the app is easy to test/embed; the actual `cli.parse()` call lives in the bin
+ * the app is easy to test/embed; the actual `cli.parse()` call lives in the CLI
  * entry, which also handles "no args" and uncaught errors.
  */
-export function createCliApp(options: CreateCliAppOptions = {}): CAC {
+export interface BrarchiveCli extends CAC {
+  pendingActions: Promise<unknown>[];
+}
+
+export function createCliApp(options: CreateCliAppOptions = {}): BrarchiveCli {
   const cli = cac("brarchive");
   const pending: Promise<unknown>[] = [];
   Object.defineProperty(cli, "pendingActions", { value: pending });
@@ -104,5 +108,7 @@ export function createCliApp(options: CreateCliAppOptions = {}): CAC {
   }
   cli.help();
 
-  return cli;
+  // `pendingActions` is attached via defineProperty above; TS cannot see it on
+  // the cac-created instance, so cast to the public BrarchiveCli shape.
+  return cli as BrarchiveCli;
 }

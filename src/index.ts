@@ -8,4 +8,3 @@ export {
   writeArchive,
 } from "./brarchive";
 export type { ArchiveFile, FileEntry } from "./brarchive";
-export { createCliApp } from "./createCliApp";

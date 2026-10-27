@@ -12,7 +12,8 @@
     "rootDir": ".",
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "resolveJsonModule": true
   },
   "include": ["src", "rolldown.config.ts", "tests"]
 }
